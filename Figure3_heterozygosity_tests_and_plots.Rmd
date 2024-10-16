@@ -1,0 +1,101 @@
+---
+title: "Figure3: heterozygosity tests"
+author: "Aurora García-Berro"
+date: "2024-10-15"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Plot for heterozygosity and PC1
+```{r input, echo=TRUE}
+library(ggplot2)
+library(plyr)
+library(ggrepel)
+library(dplyr)
+
+inp<-read.table("/home/aurora/IBB/Migratory_divide/Tables, info, miscellaneous/heterozygosity_data2_chr8_notchr8_H.txt",sep=",",header=T)
+
+inp %>%
+  group_by(Group) %>%
+  summarise(Mean = mean(Het, na.rm=TRUE),
+            Count = n())
+
+```
+
+
+```{r plot, echo=TRUE}
+# let's plot the PCA with the labels
+ggplot(inp, aes(x=PCA1, y=Het)) + geom_point() + geom_text(label=inp$Sample)
+# only some labels
+inplabels <- inp$Sample
+inplabels[with(inp, (PCA1 < 0 | PCA1 > 6))] <- ""
+
+hetpc1 <-ggplot(inp, aes(x=PCA1, y=Het, color=Group)) + 
+  geom_point(size=0.7, alpha=0.7) + 
+  geom_boxplot() +
+  #geom_text_repel(label=inplabels, size = 4/.pt, max.overlaps=100) +
+  facet_wrap(~Region) +
+  xlab("Principal-component axis 1") +
+  ylab("Proportion of heterozygous sites") +
+  scale_color_manual(values=c("#88d0c4", "#8a8a8a", "#d900ff", "#2600ff", "#ff488e")) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size=8), axis.title.y = element_text(size=8))
+
+hetpc1
+```
+
+
+
+
+## Statistical tests for heterozygosity
+
+```{r test, echo=TRUE}
+library("ggpubr")
+inp.genome <- inp %>%
+  filter(Region == "Genome")
+ggdensity(inp.genome$Het)
+```
+
+```{r test1, echo=TRUE}
+ggqqplot(inp.genome$Het)
+```
+
+```{r test2, echo=TRUE}
+shapiro.test(inp.genome$Het)
+```
+
+```{r test3, echo=TRUE}
+inp.inv <- inp %>%
+  filter(Region == "Inversion")
+
+ggdensity(inp.inv$Het)
+```
+
+```{r test4, echo=TRUE}
+ggqqplot(inp.inv$Het)
+```
+
+```{r test5, echo=TRUE}
+shapiro.test(inp.inv$Het)
+```
+
+
+The heterozygosity data for the genome and for the inversion region are not normally distributed, so we perform non-parametric tests.
+
+Genomic heterozygosity does not differ between populations:
+```{r test6, echo=TRUE}
+# Non-parametric test: Kruskall-Wallis test
+kruskal.test(Het ~ Group, data = inp.genome)
+```
+
+Heterozygosity in the inversion significantly differs between populations:
+```{r test7, echo=TRUE}
+# Non-parametric test: Kruskall-Wallis test
+kruskal.test(Het ~ Group, data = inp.inv)
+```
+

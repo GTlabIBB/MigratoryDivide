@@ -1,0 +1,199 @@
+---
+title: "Figure2: Population genetics with adegenet"
+author: "Aurora García-Berro"
+date: "2024-10-15"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Preparing data from ipyrad
+
+First we want to sort the vcf file by sample ID in order to make it easier after to add population data.
+We do that by:
+
+$ bcftools query -l data2_chr8_shortnames.vcf | sort > samples.txt
+$ bcftools view -S samples.txt data2_chr8_shortnames.vcf > data2_chr8_sorted.vcf
+
+We removed sexual chromosomes and filtered by missing data. We will filter more with R.
+
+$ vcftools --vcf data2_chr8_shortnames.vcf --max-missing 0.8 --mac 2 --recode --recode-INFO-all --stdout > data2_chr8_md80.vcf
+
+We need our file in a genind object, which is the object used within adegenet package. We can import the vcf file using the functions read.vcfR() and vcfR2genind() from the library vcfR.
+
+
+```{r load, echo=TRUE}
+library(adegenet)
+library(vcfR)
+
+# Read your dataset in genepop and convert it to genind. 
+vcf <- read.vcfR(file = "/home/aurora/IBB/Migratory_divide/pca/dataset1_only_inversion.vcf", verbose = TRUE) 
+
+x <- vcfR2genind(vcf)
+```
+
+Now we introduce population data:
+
+```{r pop, echo=TRUE}
+
+# 293 samples (- Namibia2,9,12,14,13,7 Ethiopia34 were removed due to high relatedness)
+# Middle are individuals detected as heterozygous. The first time I run this pipeline ony had North and South groups
+
+populations <- c("North","North","North","North","North","North","North","North","South","South","South","South","South","South","South","South","Middle","South","South","South","South","South","South","South","South","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","South","North","North","South","Middle","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","Middle","Middle","North","North","North","North","North","North","North","North","North","South","South","South","South","Middle","Middle","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","Middle","North","North","North","North","North","Middle","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","South","South","South","South","South","Middle","South","South","South","South","South","South","South","South","South","South","South","South","South","South","South","Middle","South","South","South","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","Middle","North","North","North","Middle","Middle","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","North","Middle","Middle","South")
+pop(x) <- populations
+```
+
+
+
+
+Now we check how many individuals a loci has.
+
+```{r loc, echo=TRUE}
+prop_typed_loc <- propTyped(x, "loc") # et diu els individus que té cada loci
+hist(prop_typed_loc, col = "grey", border = "white", nclass = 30,
+     main = "prop typed loci", xlab = "prop individuals typed")
+```
+
+
+We can also filter by individuals, knowing the proportion of loci that each individual has using the function proptyped.
+
+```{r ind, echo=TRUE}
+prop_typed_ind <- propTyped(x) # proptyped funció que diu proporció loci té cada indv
+hist(prop_typed_ind, col = "grey", border = "white", nclass = 40,
+     main = "prop typed in individuals", xlab = "prop loci typed")
+```
+
+
+We can check how many individuals we have before...
+
+```{r x, echo=TRUE}
+x
+```
+
+
+... and after filtering.
+
+
+```{r filterind, echo=TRUE}
+IND_THRESHOLD <- 0.4
+y <- x[prop_typed_ind > IND_THRESHOLD]
+y
+```
+
+Which samples were removed?
+
+```{r filterind2, echo=TRUE}
+samplenames <- indNames(y)
+length(samplenames)
+samplenames_before <- indNames(x)
+length(samplenames_before)
+diff <- unique(samplenames_before[! samplenames_before %in% samplenames]) 
+diff
+```
+
+## PCA
+
+For a pca we have to select number of principal components we retain in the option "nf". 
+
+```{r pca, echo=TRUE}
+x <- y # the rest of the code is using "x"
+x.nomd <- tab(x, freq=TRUE, NA.method="mean")
+pca.x <- dudi.pca(df = x.nomd, center = TRUE, scale = FALSE, scannf = FALSE, nf = 5)
+pca.x
+
+```
+
+At this point we run this line is to export the pca eigenvalues to plot them against heterozygosity. We'll do that later.
+
+```{r export, echo=TRUE}
+write.csv(pca.x$li, "/home/aurora/IBB/Migratory_divide/pca/eigenvalues_293_chr8.csv", row.names = TRUE)
+```
+
+We can now plot it using labels for each sample.
+
+```{r pcalabel, echo=TRUE}
+s.label(pca.x$li)
+```
+
+We can avoid labels to overlap by using wordcloud.
+
+```{r pcalabel1, echo=TRUE}
+library(wordcloud)
+textplot(pca.x$li[,1], pca.x$li[,2], words=rownames(pca.x$li),cex=0.5)
+```
+
+A nicer PCA:
+
+```{r pcafinal, echo=TRUE}
+s.class(pca.x$li, fac=pop(x),
+        col=transp(funky(4),.6),
+        axesel=FALSE, cstar=0, cpoint=1.5, grid = TRUE
+        )
+```
+
+Let's us examine the contribution of each eigenvalue. 
+
+```{r eig, echo=TRUE}
+eig.perc <- 100*pca.x$eig/sum(pca.x$eig)
+head(eig.perc)
+```
+
+In this case, most part of the variance is explained in the first axis. We can plot the second and third axis in the pca plot and will see that they don't explain variance in the groups:
+
+```{r pca2, echo=TRUE}
+s.class(pca.x$li, fac=pop(x),
+        xax=3, yax=4,
+        col=transp(funky(4),.6),
+        axesel=FALSE, cstar=0, cpoint=1.5)
+```
+
+
+These are the sample names of the potential heterozygous:
+
+```{r pca3, echo=TRUE}
+library ("dplyr")
+# let's extract samples between PC1 values of 0 and 6
+pca.coord <- pca.x$li
+pca.coord.0 <- filter(pca.coord, Axis1>0)
+pca.coord.0 <- pca.coord.0[order(pca.coord.0$Axis1),]
+pca.coord.06 <- filter(pca.coord.0, Axis1<6)
+
+het <- row.names(pca.coord.06)
+write(het, "het.txt")
+# Kenya15,Zambia3,Ethiopia27,SouthAfrica9,Malawi2,SouthAfrica22,Kenya6,Kenya2,Namibia28,Ethiopia33,Namibia8,Malawi3,SouthAfrica23,SouthAfrica24,Kenya7
+```
+
+
+## Allele contributions
+
+Allele contributions can sometimes be informative. A way to capture this is to use loadings. It is important to realize that the principal components are less interpretable and don’t have any real meaning since they are constructed as linear combinations of the initial variables. But we can analyze the loadings which describe the importance of the independent variables. The loadings are from a numerical point of view, equal to the coefficients of the variables, and provide information about which variables give the largest contribution to the components. Source: https://towardsdatascience.com/what-are-pca-loadings-and-biplots-9a7897f2e559
+
+
+- Loadings range from -1 to 1.
+
+- A high absolute value (towards 1 or -1) describes that the variable strongly influences the component. Values close to 0 indicate that the variable has a weak influence on the component.
+
+- The sign of a loading (+ or -) indicates whether a variable and a principal component are positively or negatively correlated.
+
+
+A basic graphic for representing allele loadings is s.arrow. It represents the results of the PCA (pca.x$c1).
+
+```{r sarrow, echo=TRUE}
+s.arrow(pca.x$c1)
+```
+
+
+
+We can also represent loadings by using loadingplot, which represents one axis at a time. The loadingplot function simply represents positive values of a vector and identifies the values above a given threshold.
+
+```{r loading, echo=TRUE}
+loadingplot(pca.x$c1^2)
+```
+
+From the above plots, we can see that locus 3203. Let's see with this function we can get the SNPs contributing with a certain threshold.
+
+
