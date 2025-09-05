@@ -1,0 +1,423 @@
+---
+title: "Fst calculation and visualisation"
+author: "Aurora García-Berro"
+date: "10/3/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/home/aurora/IBB/Migratory_divide/Pixy")
+```
+
+## Plot Fst
+
+The input is a file containing Fst values for each site. This can be obtained with the command:
+vcftools --vcf in_dataset.vcf --weir-fst-pop pop1_samples.txt --weir-fst-pop pop2_samples.txt --out dataset_fst.fst
+
+
+```{r cars}
+# read in the file
+library(readr)
+library(ggplot2)
+library(dplyr)
+fst<-read.table("/home/aurora/IBB/Migratory_divide/Pixy/zambia/fst_all_chr_window100_nanfree.txt",sep="\t",header=T)
+```
+
+Fst can be positive or negative. For visualization, we will use absolute values.
+
+```{r pressure, echo=FALSE}
+# New column with absolute Fst values 
+fst <- fst %>% mutate(fst_abs = abs(fst))
+fst
+```
+
+
+There are many methods for performing outlier tests. Some use coalescent simulations, others use Bayesian inference to estimate the posterior probability that a SNP is an outlier and therefore putatively under selection. However, the simplest way to detect outliers is to use the empirical distribution of FST to look for SNPS that exceed an arbitrary threshold of differentiation. This method has been used quite a lot in the literature but it is not without caveats. Typically the threshold is set at either the 95th or 99th percentile of the empirical data. We will identify the *95% and 99% percentile*.
+
+```{r pressure, echo=FALSE}
+# identify the 95% and 99% percentile
+quantile(fst$fst, c(0.975, 0.9915), na.rm = T)
+
+# or the other way around, ask to which percentile a value belongs to:
+percentile <- ecdf(fst$fst)
+percentile(0.7)
+```
+
+Let's identify which SNPs are outliers above the 95% threshold. *ifelse* takes a logical argument first (i.e. is fst greater than the threshold we set). If this is the case (i.e. it is TRUE), it will print “outlier” but if not, it just prints “background”.
+
+```{r pressure, echo=FALSE}
+library(dplyr)
+# identify the 95% percentile
+my_threshold <- quantile(fst$fst_abs, 0.970, na.rm = T)
+# make an outlier column in the data.frame
+fst <- fst %>% mutate(outlier = ifelse(fst_abs > my_threshold, "outlier", "background"))
+fst %>% group_by(outlier) %>% tally()
+```
+
+
+Make the plot of Fst per chromosome (manhatthan plot):
+```{r anotherpi, echo=TRUE}
+# Label the chromosomes on the dataset
+fst$chr <- factor(fst$chr, labels = c("Z", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "W", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30"))
+
+g0 <- ggplot(fst, aes(pos1, abs(fst))) + 
+    ylab(expression(F[ST])) +
+    geom_point(size=0.2) + 
+      theme(axis.text.x=element_blank(), 
+            axis.title.x=element_blank()) +
+    # We define the order of the chromosomes, and scale and space allow for adjusting to the length of X variable in each subplot, and switch is for puting face grid titles (chr names) in the bottom
+    facet_grid(~ factor(chr, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "Z", "W")), scales = "free", space = "free_x", switch="x") +
+  theme(
+    # formating the face grid titles, puting them white...
+    strip.background = element_blank(), 
+    strip.placement = "outside", 
+    axis.text.x=element_blank(), 
+    axis.ticks.x=element_blank(),
+    # formating the general layout of the plot
+    panel.spacing =  unit(0.05, 'lines'),
+    panel.background = element_blank(),
+    panel.grid.major = element_line(colour = "grey", size = (0.15)),
+    panel.grid.major.x = element_blank()) +
+  scale_x_continuous(expand = c(0.05,0.05)
+  )
+# Setting exceptions on the dataset to paint their dots on different color
+chr2 <- subset(fst, chr == 2)
+chr4 <- subset(fst, chr == 4)
+chr6 <- subset(fst, chr == 6)
+chr8 <- subset(fst, chr == 8)
+chr10 <- subset(fst, chr == 10)
+chr12 <- subset(fst, chr == 12)
+chr14 <- subset(fst, chr == 14)
+chr16 <- subset(fst, chr == 16)
+chr18 <- subset(fst, chr == 18)
+chr20 <- subset(fst, chr == 20)
+chr22 <- subset(fst, chr == 22)
+chr24 <- subset(fst, chr == 24)
+chr26 <- subset(fst, chr == 26)
+chr28 <- subset(fst, chr == 28)
+chr30 <- subset(fst, chr == 30)
+chrw <- subset(fst, chr == "W")
+
+# Add the extra colors in the plot
+fstplotbo <- g0 + geom_point(data = chr2, color = "#696969", size=0.2) + geom_point(data = chr4, color = "#696969", size=0.2) + geom_point(data = chr6, color = "#696969", size=0.2) + geom_point(data = chr8, color = "#696969", size=0.2) + geom_point(data = chr10, color = "#696969", size=0.2) + geom_point(data = chr12, color = "#696969", size=0.2) + geom_point(data = chr14, color = "#696969", size=0.2) + geom_point(data = chr16, color = "#696969", size=0.2) + geom_point(data = chr18, color = "#696969", size=0.2) + geom_point(data = chr20, color = "#696969", size=0.2) + geom_point(data = chr22, color = "#696969", size=0.2) + geom_point(data = chr24, color = "#696969", size=0.2) + geom_point(data = chr26, color = "#696969", size=0.2) + geom_point(data = chr28, color = "#696969", size=0.2) + geom_point(data = chr30, color = "#696969", size=0.2) + geom_point(data = chrw, color = "#696969", size=0.2) 
+```   
+
+In addition, plot chromosome 8 only to better visualise the inversion:
+```{r anotherpi, echo=TRUE}
+fst_34 <- fst %>% 
+  filter(chr == "LR999934.1")
+g0 <- ggplot(fst_34, aes(pos, fst)) + 
+    geom_point()
+```
+
+
+
+## Plot π
+
+First, we look at some basic stats:
+```{r row, echo=TRUE}
+data_stats <-data %>%
+  group_by(pop) %>%
+  summarize(
+    Mean=mean(pi),
+    Sd=sd(pi))
+
+```
+
+
+Make a boxplot:
+```{r jitter, echo=TRUE}
+boxplot_pi_jitter <- 
+    ggplot(inp, aes(x=pop, y=pi, fill=pop)) +
+    geom_boxplot() +
+    #scale_fill_viridis(discrete = TRUE, alpha=0.6, option="A") +
+    geom_jitter(color="black", size=0.2, alpha=0.02) +
+    theme_ipsum() +
+    theme(
+      legend.position="none",
+      plot.title = element_text(size=11)
+    ) +
+    ggtitle("Pi") +
+    xlab("")
+boxplot_pi_jitter
+
+```
+
+
+Now testing differences between populations. We first look at normality. We visualize the distribution of the whole variable, and we see it does not look normal...
+
+```{r plot normality}
+hist(data$pi, 
+     main="Pi distribution", 
+     xlab="Pi", 
+     col="blue", 
+     las=1, 
+     breaks=7)
+```
+
+The tail of the distribution is on the right, so the variable is right skewed It is also called positive skewed data.
+
+We can also do a Q-Q plot (or quantile-quantile plot), which draws the correlation between a given sample and the normal distribution. A 45-degree reference line is also plotted. 
+
+
+Let's do the test of normality.
+```{r test}
+shapiro.test(data$pi) # Does not work because we have too many data points! Lots of discussion online about the point of testing nromality in such big datastets: https://stats.stackexchange.com/questions/446262/can-a-sample-larger-than-5-000-data-points-be-tested-for-normality-using-shapiro
+```
+We can transform it and then check the distribution again, to see if it looks more gaussian (unimodal). It won't be the same as a normality test though, but p-values are not trustworthy for these datasets either. Common transformations of right skewed data include square root, cube root, and log.
+
+```{r transf}
+data_transf <- data %>%
+  mutate(pi_log = log10(data$pi)) %>%
+  mutate(pi_sqrt = sqrt(data$pi))
+
+hist(data_transf$pi_sqrt, 
+     main="Pi distribution", 
+     xlab="Pi", 
+     col="blue", 
+     las=1, 
+     breaks=7)
+```
+
+We also have to check for homogeneity of variance too using Barlett test and Levene's which is less sensible to deviations from normality. We can see that both reveal homogeneity of variances. 
+
+```{r variance}
+bartlett.test(pi_sqrt ~ pop, data=data_transf)
+```
+
+```{r variance2}
+library(car)
+leveneTest(pi_sqrt ~ pop, data=data_transf)
+```
+
+```{r ttest}
+t.test(pi ~ pop, data=data_transf)
+t.test(pi ~ pop, data=pi) # Default t-test, which assumes not equal var
+t.test(pi ~ pop, data=pi, var.equal = TRUE) # Student t test for data with equal variances
+wilcox.test(pi ~ pop, data=pi) # non parametric version of students t-test
+```
+
+Permutation test:
+
+```{r pixy2long}
+set.seed(101) ## for reproducibility
+nsim <- 9999
+res <- numeric(nsim) ## set aside space for results
+for (i in 1:nsim) {
+    ## standard approach: scramble response value
+    perm <- sample(nrow(pi))
+    bdat <- transform(data,pi=pi[perm])
+    ## compute & store difference in means; store the value
+    res[i] <- mean(bdat$pi[bdat$pop=="S"])-
+        mean(bdat$pi[bdat$pop=="N"])
+}
+obs <- mean(data$pi[data$pop=="S"])-
+        mean(data$pi[data$pop=="N"])
+## append the observed value to the list of results
+res <- c(res,obs)
+```
+
+```{r pixy2long}
+# Último elemento es el observado:
+obs <- res[length(res)]
+
+# P-value (two-tailed test):
+p_value <- mean(abs(res[-length(res)]) >= abs(obs))
+
+print(p_value)
+```
+
+
+```{r pixy2long}
+hist(res,col="gray",las=1,main="")
+abline(v=obs,col="red")
+```
+
+
+```{r pixy2long}
+agg <- aggregate(pi~pop,FUN=mean,data=bdat)
+res[i] <- agg$pi[1]-agg$pi[2]
+res[i] <- (bdat
+    %>% group_by(pi)
+    %>% summarise(pi=mean(pi))
+    %>% pull(pi)  ## extract a single column
+    %>% diff()          ## difference between elements
+)
+2*mean(res>=obs)  
+```
+
+
+```{r pixy2long}
+library(lmPerm)
+summary(lmp(pi~pop,data=data))
+```
+
+```{r pixy2long}
+library(effsize)
+cohen.d(pi ~ pop, data = data)
+```
+
+Yet another way to do the permutation test:
+
+Now write two functions. The first, simfun(), simulates a randomized data set given inputs (in this case, the input is a list of elements to be assigned to the “field” category). We take the colonies column from the original ants data set and arrange the field-assigned colony counts first, and the non-field-assigned colony counts second.
+The second function, sumfun(), takes a simulated data set and returns whatever summary statistic we want. In this case I decided to use the t statistic as computed by R. (In many cases simple summary statistics can be computed more efficiently by doing it by hand, but it’s often conceptually clearer to run exactly the same test that we would have used in the non-permutation analysis and extract the test statistic, which is usually stored as a list element called “statistic”, from it.)
+
+```{r pixy2long}
+simfun_rsamp <- function() {
+    transform(data,pi=sample(pi))
+}
+sumfun <- function(dat) {
+    t.test(pi~pop,data=data,var.equal=TRUE)$statistic
+}
+```
+
+```{r pixy2long}
+# Comparing distribution of possible t test to the observed t test
+tt <- t.test(pi~pop,data=data,var.equal=TRUE)
+obs_stat <- tt$statistic
+set.seed(109)
+permdist_rsamp <- replicate(9999,sumfun(simfun_rsamp()))
+2*mean(permdist_rsamp>=obs_stat) # does not work
+```
+
+```{r pixy2long}
+# visualize it
+hist(permdist_rsamp,col="gray",breaks=30,freq=FALSE,main="")
+curve(dt(x,df=tt$parameter),add=TRUE,col="red")
+abline(v=obs_stat,col="blue")
+```
+```{r pixy2long}
+chi_test <- chisq.test(data$pi, data$pop)
+chi_test$statistic
+chi_test$p.value
+chi_test$expected
+```
+
+
+
+Finally, plot pi per chromosome (manhatthan plot):
+```{r anotherpi, echo=TRUE}
+library(ggplot2)
+library(zoo)
+library(tidyquant) 
+
+pi<-read.table("/home/aurora/IBB/Migratory_divide/Pixy/zambia/pi_all_chr_window1Mb_nanfree.txt",sep="\t",header=T)
+
+# Label the chromosomes on the dataset
+pi$chr <- factor(pi$chr, labels = c("Z", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "W", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30"))
+
+piplot <- ggplot(pi) +
+    geom_line(aes(x=pos1, y=pi, colour=pop), size=0.2) +
+    scale_color_manual(values=c('#88d0c4', '#d900ff')) + 
+    #xlab("Chromosome") +
+    theme(panel.background = element_blank(), axis.text.x=element_blank(), axis.title.x=element_blank())+
+    ylab(expression(π)) +
+    guides(color = FALSE) +
+    #geom_point(size=0.3) + 
+    #geom_ma(ma_fun = SMA, n = 1000, color="maroon", linetype="solid", size=0.3) +
+    #coord_cartesian(ylim = c(0, 0.025)) +
+    # We define the order of the chromosomes, and scale and space allow for adjusting to the length of X variable in each subplot, and switch is for putting face grid titles (chr names) in the bottom
+    facet_grid(~ factor(chr, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "Z", "W")), scales = "free", space = "free_x", switch="x") +
+  theme(
+    # formating the face grid titles, putting them white...
+    strip.background = element_blank(), 
+    strip.placement = "outside", 
+    axis.text.x=element_blank(), 
+    axis.ticks.x=element_blank(),
+    # formating the general layout of the plot
+    panel.spacing =  unit(0.03, 'lines'), 
+    panel.background = element_blank(), # fons blanc
+    panel.grid.major = element_line(colour = "grey", size = (0.15)), # linies horitzontals
+    panel.grid.major.x = element_blank()) + # eliminar linies verticals
+  scale_x_continuous(expand = c(0.05,0.05)
+  )
+# Setting exceptions on the dataset to paint their dots on different color
+chr2 <- subset(pi, chr == 2)
+chr4 <- subset(pi, chr == 4)
+chr6 <- subset(pi, chr == 6)
+chr8 <- subset(pi, chr == 8)
+chr10 <- subset(pi, chr == 10)
+chr12 <- subset(pi, chr == 12)
+chr14 <- subset(pi, chr == 14)
+chr16 <- subset(pi, chr == 16)
+chr18 <- subset(pi, chr == 18)
+chr20 <- subset(pi, chr == 20)
+chr22 <- subset(pi, chr == 22)
+chr24 <- subset(pi, chr == 24)
+chr26 <- subset(pi, chr == 26)
+chr28 <- subset(pi, chr == 28)
+chr30 <- subset(pi, chr == 30)
+chrw <- subset(pi, chr == "W")
+
+# Add the extra colors in the plot
+piplot + geom_point(data = chr2, color = "#696969", size=0.2) + geom_point(data = chr4, color = "#696969", size=0.2) + geom_point(data = chr6, color = "#696969", size=0.2) + geom_point(data = chr8, color = "#696969", size=0.2) + geom_point(data = chr10, color = "#696969", size=0.2) + geom_point(data = chr12, color = "#696969", size=0.2) + geom_point(data = chr14, color = "#696969", size=0.2) + geom_point(data = chr16, color = "#696969", size=0.2) + geom_point(data = chr18, color = "#696969", size=0.2) + geom_point(data = chr20, color = "#696969", size=0.2) + geom_point(data = chr22, color = "#696969", size=0.2) + geom_point(data = chr24, color = "#696969", size=0.2) + geom_point(data = chr26, color = "#696969", size=0.2) + geom_point(data = chr28, color = "#696969", size=0.2) + geom_point(data = chr30, color = "#696969", size=0.2) + geom_point(data = chrw, color = "#696969", size=0.2)
+
+``` 
+
+
+
+
+
+
+## Plot Dxy
+
+Plot Dxy per chromosome (manhatthan plot):
+
+```{r anotherpi, echo=TRUE}
+dxy<-read.table("/home/aurora/IBB/Migratory_divide/Pixy/zambia/dxy_all_chr_window1Mb_nanfree.txt",sep="\t",header=T)
+
+# Label the chromosomes on the dataset
+dxy$chr <- factor(dxy$chr, labels = c("Z", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "W", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30"))
+
+library(ggplot2)
+library(zoo)
+library(tidyquant) 
+
+dxyplot <- ggplot(dxy, aes(pos1, dxy)) + 
+    #xlab("Chromosome") +
+    ylab(expression(D[XY])) +
+    geom_line(color="maroon", linetype="solid", size=0.2) +  
+    theme(axis.title.x=element_blank()) +
+    #geom_point(size=0.3) + 
+    #geom_ma(ma_fun = SMA, n = 300, color="maroon", linetype="solid", size=0.3) +
+    #coord_cartesian(ylim = c(0, 0.025)) +
+    # We define the order of the chromosomes, and scale and space allow for adjusting to the length of X variable in each subplot, and switch is for putting face grid titles (chr names) in the bottom
+    facet_grid(~ factor(chr, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "Z", "W")), scales = "free", space = "free_x", switch="x") +
+  theme(
+    # formating the face grid titles, putting them white...
+    strip.background = element_blank(), 
+    strip.placement = "outside", 
+    axis.text.x=element_blank(), 
+    axis.ticks.x=element_blank(),
+    # formating the general layout of the plot
+    panel.spacing =  unit(0.03, 'lines'), 
+    panel.background = element_blank(), # fons blanc
+    panel.grid.major = element_line(colour = "grey", size = (0.15)), # linies horitzontals
+    panel.grid.major.x = element_blank()) + # eliminar linies verticals
+  scale_x_continuous(expand = c(0.05,0.05)
+  )
+# Setting exceptions on the dataset to paint their dots on different color
+chr2 <- subset(dxy, chr == 2)
+chr4 <- subset(dxy, chr == 4)
+chr6 <- subset(dxy, chr == 6)
+chr8 <- subset(dxy, chr == 8)
+chr10 <- subset(dxy, chr == 10)
+chr12 <- subset(dxy, chr == 12)
+chr14 <- subset(dxy, chr == 14)
+chr16 <- subset(dxy, chr == 16)
+chr18 <- subset(dxy, chr == 18)
+chr20 <- subset(dxy, chr == 20)
+chr22 <- subset(dxy, chr == 22)
+chr24 <- subset(dxy, chr == 24)
+chr26 <- subset(dxy, chr == 26)
+chr28 <- subset(dxy, chr == 28)
+chr30 <- subset(dxy, chr == 30)
+chrw <- subset(dxy, chr == "W")
+
+# Add the extra colors in the plot
+g0 + geom_point(data = chr2, color = "#696969", size=0.2) + geom_point(data = chr4, color = "#696969", size=0.2) + geom_point(data = chr6, color = "#696969", size=0.2) + geom_point(data = chr8, color = "#696969", size=0.2) + geom_point(data = chr10, color = "#696969", size=0.2) + geom_point(data = chr12, color = "#696969", size=0.2) + geom_point(data = chr14, color = "#696969", size=0.2) + geom_point(data = chr16, color = "#696969", size=0.2) + geom_point(data = chr18, color = "#696969", size=0.2) + geom_point(data = chr20, color = "#696969", size=0.2) + geom_point(data = chr22, color = "#696969", size=0.2) + geom_point(data = chr24, color = "#696969", size=0.2) + geom_point(data = chr26, color = "#696969", size=0.2) + geom_point(data = chr28, color = "#696969", size=0.2) + geom_point(data = chr30, color = "#696969", size=0.2) + geom_point(data = chrw, color = "#696969", size=0.2)
+
+dxyplot
+```   
+
